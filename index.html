@@ -70,7 +70,7 @@ var firebaseConfig = {
 var FIRESTORE_OPTIONS = {
   useAnonymousAuth: false,   // true = ล็อกอินแบบ Anonymous อัตโนมัติ (ต้องเปิด Authentication → Sign-in method → Anonymous) ใช้คู่กับ Rules แบบ request.auth != null
   collectionPrefix: '',      // เช่น 'test_' เพื่อแยกข้อมูลทดสอบออกจากข้อมูลจริง (test_hardware, test_employees, …)
-  logLimit:         600      // จำนวนประวัติการแก้ไขล่าสุดที่โหลดมาแสดง (ยิ่งมาก ยิ่งใช้จำนวน read มาก)
+  logLimit:         150      // จำนวนประวัติการแก้ไขล่าสุดที่โหลดมาแสดง (ยิ่งมาก ยิ่งใช้จำนวน read มาก)
 };
 </script>
 <!-- Firebase JS SDK (compat) — ใช้กับโค้ดเดิมที่เป็นสคริปต์ธรรมดาได้โดยไม่ต้อง build -->
