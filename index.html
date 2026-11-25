@@ -48,20 +48,55 @@ tailwind.config = {
 <!-- อ่าน/เขียนไฟล์ Excel — โหลดแบบ defer ไม่ถ่วงการเปิดหน้า -->
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<!-- ============================================================
-     IT-ICT HUB — ทำงานแบบออฟไลน์ ไฟล์เดียวจบ
+<!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  🔥 FIREBASE CONFIG — ใส่ค่าของโปรเจกต์ ict-inv-system ตรงนี้ (ที่เดียว)   ║
+     ╚══════════════════════════════════════════════════════════════════════╝
+     คัดลอกค่าจาก: Firebase Console → ⚙ Project settings → General
+                   → Your apps → (Web app </>) → SDK setup and configuration → Config
+     ต้องเปลี่ยน 3 ค่า: apiKey · messagingSenderId · appId  (ค่าอื่นตั้งไว้ตามชื่อโปรเจกต์แล้ว)
+     หมายเหตุ: ถ้าโปรเจกต์สร้างก่อน ส.ค. 2024 storageBucket อาจเป็น "ict-inv-system.appspot.com"
+               (ระบบนี้ไม่ได้ใช้ Storage — ค่านี้ผิดก็ไม่กระทบ) -->
+<script>
+var firebaseConfig = {
+  apiKey:            "AIzaSyCyFMYQFY-pcYcvw2s49Wtsm4UOkfhUWnw",
+  authDomain:        "ict-inv-system.firebaseapp.com",
+  projectId:         "ict-inv-system",
+  storageBucket:     "ict-inv-system.firebasestorage.app",
+  messagingSenderId: "221433257160",
+  appId:             "1:221433257160:web:bb8ad69588e07e8f3499fd",
+};
 
-     ไม่มีระบบล็อกอิน ไม่เชื่อมต่อ Firebase หรือเซิร์ฟเวอร์ใด ๆ
-     เปิดไฟล์นี้แล้วใช้งานได้ทันที (ดับเบิลคลิกจากเครื่อง หรือวางบน Netlify)
+/* ตัวเลือกการเชื่อมต่อ Firestore (ไม่ต้องแก้ก็ใช้งานได้) */
+var FIRESTORE_OPTIONS = {
+  useAnonymousAuth: false,   // true = ล็อกอินแบบ Anonymous อัตโนมัติ (ต้องเปิด Authentication → Sign-in method → Anonymous) ใช้คู่กับ Rules แบบ request.auth != null
+  collectionPrefix: '',      // เช่น 'test_' เพื่อแยกข้อมูลทดสอบออกจากข้อมูลจริง (test_hardware, test_employees, …)
+  logLimit:         600      // จำนวนประวัติการแก้ไขล่าสุดที่โหลดมาแสดง (ยิ่งมาก ยิ่งใช้จำนวน read มาก)
+};
+</script>
+<!-- Firebase JS SDK (compat) — ใช้กับโค้ดเดิมที่เป็นสคริปต์ธรรมดาได้โดยไม่ต้อง build -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<!-- ═══════════════════════ จบส่วน FIREBASE CONFIG ═══════════════════════ -->
+
+<!-- ============================================================
+     IT-ICT HUB — ไฟล์เดียวจบ · เก็บข้อมูลบน Cloud Firestore (โปรเจกต์ ict-inv-system)
+
+     ไม่มีระบบล็อกอิน (เหมือนเดิม) · ใส่ค่า firebaseConfig ด้านบนก่อนใช้งาน
+     เปิดไฟล์นี้แล้วใช้งานได้ทันที (วางบน Netlify / Firebase Hosting หรือดับเบิลคลิกจากเครื่อง)
 
      ข้อมูลเก็บที่ไหน
-       • ทะเบียนทั้งหมดเก็บใน localStorage ของเบราว์เซอร์เครื่องที่เปิดใช้งาน
-         คีย์ 'ict-saas-v1' — แยกกันคนละเครื่อง คนละเบราว์เซอร์ ไม่ซิงก์หากัน
-       • ล้างข้อมูลเว็บไซต์ / เปิดโหมดไม่ระบุตัวตน = ข้อมูลหาย
+       • ทะเบียนทั้งหมดเก็บใน Cloud Firestore — ทุกเครื่อง ทุกเบราว์เซอร์เห็นข้อมูลชุดเดียวกัน
+         และอัปเดตแบบ realtime เมื่อมีคนแก้ไข
+         คอลเลกชัน: hardware · licenses · subscriptions · onboard · services · employees · tickets
+                    app_meta (state / order / extra) · edit_log (ประวัติการแก้ไข)
+       • ครั้งแรกที่เปิด (Firestore ยังว่าง): ถ้าเบราว์เซอร์นี้มีข้อมูลเดิมใน localStorage 'ict-saas-v1'
+         ระบบจะถามว่าจะอัปโหลดขึ้น Cloud หรือไม่ (ไม่มี = อัปโหลดข้อมูลตั้งต้น)
+       • localStorage ใช้เฉพาะค่าการแสดงผลของแต่ละเครื่อง (ธีม / มุมมองตาราง) และสำเนาสำรองก่อนกู้คืน
        • สำรองข้อมูลได้ที่เมนู "ระบบ" ด้านล่างซ้าย → คัดลอก JSON สำรอง
-         และกู้คืนด้วยการวาง JSON กลับเข้าไปในช่องเดียวกัน
+         และกู้คืนด้วยการวาง JSON กลับเข้าไปในช่องเดียวกัน (กู้คืนแล้วบันทึกขึ้น Cloud ทันที)
 
-     ยังต้องต่ออินเทอร์เน็ตอยู่สำหรับโหลด Tailwind / React / ฟอนต์ จาก CDN
+     ต้องต่ออินเทอร์เน็ตสำหรับโหลด Tailwind / React / Firebase / ฟอนต์ จาก CDN
 
      Export to HTML (เมนู "ระบบ" → Export HTML · หรือปุ่มในหน้า "ข้อมูล & สำรอง")
        • ดาวน์โหลดหน้าเว็บนี้เป็นไฟล์ .html ไฟล์เดียว พร้อมข้อมูลล่าสุดทั้งหมด
@@ -1555,25 +1590,24 @@ var SNAP = (function(){ try{ var el = document.getElementById('snap'); return el
 function useSnap(raw){
   if(!SNAP || !SNAP.data) return raw;
   var cur = null; try{ cur = raw ? JSON.parse(raw) : null; }catch(e){}
-  /* ประวัติการแก้ไข: รวมของในไฟล์กับของในเบราว์เซอร์ (ไม่ซ้ำ) */
+  /* ประวัติการแก้ไข: รวมของในไฟล์กับของบน Cloud (ไม่ซ้ำ) */
   try{
     if(Array.isArray(SNAP.log) && SNAP.log.length){
-      var mine = JSON.parse(localStorage.getItem('ict-asset-log')) || [], seen = {};
+      var mine = LOG.all(), seen = {};
       mine.forEach(function(x){ seen[x._id] = 1; });
-      var all = mine.concat(SNAP.log.filter(function(x){ return !seen[x._id]; })).sort(function(a, b){ return (b.at||0)-(a.at||0); });
-      localStorage.setItem('ict-asset-log', JSON.stringify(all.slice(0,600)));
+      LOG.write(mine.concat(SNAP.log.filter(function(x){ return !seen[x._id]; })).sort(function(a, b){ return (b.at||0)-(a.at||0); }));
     }
   }catch(e){}
   /* ใช้ข้อมูลในไฟล์เมื่อเบราว์เซอร์นี้ยังไม่มีข้อมูล หรือข้อมูลในไฟล์ใหม่กว่า */
   if(cur && cur.data && (cur.savedAt||0) >= (SNAP.savedAt||0)) return raw;
   /* เบราว์เซอร์มีข้อมูลอยู่แล้ว (เก่ากว่า): เก็บสำรองไว้ก่อน แล้วถามก่อนแทนที่ */
   if(raw){
-    var okSnap = true; try{ okSnap = window.confirm('ไฟล์นี้มีข้อมูลใหม่กว่าข้อมูลในเบราว์เซอร์ — ต้องการแทนที่ข้อมูลในเบราว์เซอร์หรือไม่? (ข้อมูลเดิมจะถูกเก็บสำรองไว้)'); }catch(e4){}
+    var okSnap = true; try{ okSnap = window.confirm('ไฟล์นี้มีข้อมูลใหม่กว่าข้อมูลบน Cloud Firestore — ต้องการแทนที่ข้อมูลบน Cloud (ทุกเครื่อง) หรือไม่? (ข้อมูลเดิมจะถูกเก็บสำรองไว้ในเบราว์เซอร์นี้)'); }catch(e4){}
     if(!okSnap) return raw;
     try{ localStorage.setItem(KEY+'-pre-snap-'+Date.now(), raw); }catch(e3){}
   }
   var nr = JSON.stringify({v:1, mig:SNAP.mig||0, savedAt:SNAP.savedAt||Date.now(), data:SNAP.data});
-  try{ localStorage.setItem(KEY, nr); }catch(e){}
+  CLOUD.bootDirty = true;   /* ใช้ข้อมูลจากไฟล์ → บันทึกขึ้น Cloud หลังโหลดเสร็จ */
   return nr;
 }
 /* โหลดข้อมูลเดิมไม่สำเร็จ: เก็บสำเนาข้อมูลดิบไว้ และห้ามบันทึกทับจนกว่าผู้ใช้จะยืนยัน */
@@ -1582,11 +1616,11 @@ function loadFail(raw, msg){
   LOAD_ERR = msg || 'ข้อมูลเสียหาย';
   if(raw){ LOAD_ERR_KEY = KEY+'-corrupt-'+Date.now(); try{ localStorage.setItem(LOAD_ERR_KEY, raw); }catch(e){ LOAD_ERR_KEY = ''; } }
 }
-function loadData(src){   /* src: สตริง JSON {mig,data} จากไฟล์สำรอง (กู้คืน) — ไม่อ่าน localStorage และคืน null ถ้าใช้ไม่ได้ */
+function loadData(src){   /* src: สตริง JSON {mig,data} จากไฟล์สำรอง (กู้คืน) — ไม่อ่านข้อมูลจาก Cloud และคืน null ถ้าใช้ไม่ได้ */
   try{
     var raw = null;
     if(src!=null) raw = src;
-    else { try{ raw = localStorage.getItem(KEY); }catch(e0){} raw = useSnap(raw); }
+    else { raw = CLOUD_RAW; raw = useSnap(raw); }   /* ข้อมูลที่โหลดจาก Cloud Firestore (null = ยังไม่มีข้อมูลบน Cloud) */
     if(raw){ var o=JSON.parse(raw);
       var empNew = o && o.data && !Array.isArray(o.data.employees);
       if(empNew) o.data.employees = (SEED.employees||[]).map(function(r){ return Object.assign({}, r); });   /* ชุดข้อมูลใหม่: Employees */
@@ -1953,7 +1987,7 @@ function loadData(src){   /* src: สตริง JSON {mig,data} จากไ�
               r.ptype = x.ptype; r.spec = x.spec; r.note = x.note;
             });
           }
-          if(src==null) try{ localStorage.setItem(KEY, JSON.stringify({v:1,mig:MIG,savedAt:o.savedAt||Date.now(),data:o.data})); }catch(e2){}
+          if(src==null) CLOUD.bootDirty = true;   /* ผ่าน migration แล้ว → บันทึกขึ้น Cloud หลังโหลดเสร็จ */
         }
         return {data:o.data, savedAt:o.savedAt||0};
       }
@@ -1967,11 +2001,306 @@ function loadData(src){   /* src: สตริง JSON {mig,data} จากไ�
   if(raw) loadFail(raw, 'โครงสร้างข้อมูลไม่ถูกต้อง');
   return {data:seedData(), savedAt:0};
 }
-var boot = loadData();
+/* ================= Cloud Firestore (แทน localStorage) =================
+   โครงสร้างใน Firestore (โปรเจกต์ตาม firebaseConfig ใน <head>):
+     hardware / licenses / subscriptions / onboard / services / employees / tickets
+         → 1 เอกสารต่อ 1 รายการ · Document ID = _id ของรายการ (ข้อมูลภายในเหมือนเดิมทุกฟิลด์)
+     app_meta/state   → {mig, savedAt, by}  เวอร์ชันข้อมูล + เวลาบันทึกล่าสุด
+     app_meta/order   → ลำดับรายการของแต่ละชุด (คงลำดับในตารางเหมือนเดิม)
+     app_meta/extra   → ค่าอื่นใน data ที่ไม่ใช่รายการ (ถ้ามี)
+     edit_log         → ประวัติการแก้ไข (เดิมอยู่ใน localStorage 'ict-asset-log')
+   การบันทึก: commit() → persist() → เทียบกับข้อมูลบน Cloud แล้วเขียนเฉพาะรายการที่เปลี่ยน (batch ละ ≤ 400)
+   การซิงก์: ฟังการเปลี่ยนแปลงแบบ realtime — เครื่องอื่นแก้ไข หน้านี้อัปเดตเองโดยไม่ต้องรีเฟรช */
+var CLOUD_RAW = null;
+var CLOUD = (function(){
+  var cfg = window.firebaseConfig || {}, opt = window.FIRESTORE_OPTIONS || {};
+  var P = String(opt.collectionPrefix || '');
+  var COLLS = ['hardware','licenses','subscriptions','onboard','services','employees','tickets'];
+  var META = P+'app_meta', LOGC = P+'edit_log';
+  var LOG_LIMIT = Math.max(50, Number(opt.logLimit) || 600);
+  var CID = 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);   /* รหัสหน้าต่างนี้ — ใช้แยกการบันทึกของเราออกจากเครื่องอื่น */
+  var fs = null, inited = false;
+  var S = {sets:{}, order:{}, extra:'{}', hasState:false, mig:0};   /* สิ่งที่ Cloud มีอยู่ (ตามที่หน้านี้รู้) */
+  var Q = {}, busy = false, retryT = 0, retryN = 0;
+  var st = 'ok', stErr = '', stSubs = [];
+  var remoteQ = [], applyFn = null, logIds = '';
+  var api = {note:'', bootDirty:false, LOG_LIMIT:LOG_LIMIT, COLLS:COLLS};
+
+  /* ---------- helpers ---------- */
+  function norm(v){ return v===undefined ? null : JSON.parse(JSON.stringify(v)); }
+  function stable(v){
+    if(v===null || typeof v!=='object') return JSON.stringify(v===undefined ? null : v);
+    if(Array.isArray(v)) return '['+v.map(stable).join(',')+']';
+    return '{'+Object.keys(v).filter(function(k){ return v[k]!==undefined; }).sort()
+      .map(function(k){ return JSON.stringify(k)+':'+stable(v[k]); }).join(',')+'}';
+  }
+  function sig(rec){ return stable(norm(rec)); }
+  var BADKEY = /^$|^__.*__$|[.\[\]*`~\/]/;
+  function fsOk(v, depth, inArr){
+    if(v===null || typeof v!=='object') return true;
+    if(depth > 18) return false;
+    if(Array.isArray(v)) return !inArr && v.every(function(x){ return fsOk(x, depth+1, true); });
+    return Object.keys(v).every(function(k){ return k.length < 1400 && !BADKEY.test(k) && fsOk(v[k], depth+1, false); });
+  }
+  /* เก็บเป็นฟิลด์ปกติ (อ่านง่ายใน Firebase Console) · ถ้ารูปแบบที่ Firestore ไม่รองรับ (array ซ้อน array / ชื่อฟิลด์พิเศษ) → เก็บเป็น JSON */
+  function enc(n){ return fsOk(n, 0, false) ? n : {_id:n && n._id != null ? n._id : null, __json:JSON.stringify(n)}; }
+  function dec(d){ if(d && typeof d.__json==='string'){ try{ return JSON.parse(d.__json); }catch(e){} } return d; }
+  function safeId(s){
+    s = String(s).replace(/%/g,'%25').replace(/\//g,'%2F');
+    if(s==='.' || s==='..' || /^__.*__$/.test(s)) s = '_'+s;
+    return s.length > 700 ? s.slice(0,700) : s;
+  }
+  function keyOf(rec, i, used){
+    var k = safeId(rec && rec._id!=null && rec._id!=='' ? rec._id : 'noid-'+i), base = k, n = 1;
+    while(used[k]) k = base+'~'+(++n);
+    used[k] = 1; return k;
+  }
+  function sortByOrder(list, order){   /* list: [{k, rec}] */
+    if(!Array.isArray(order) || !order.length) return list;
+    var pos = {}; order.forEach(function(k, i){ pos[k] = i; });
+    return list.map(function(x, i){ return {x:x, i:i, p:(x.k in pos) ? pos[x.k] : 1e9+i}; })
+      .sort(function(a, b){ return a.p-b.p || a.i-b.i; }).map(function(o){ return o.x; });
+  }
+  function errText(e){
+    var c = String(e && e.code || ''), m = String(e && e.message || e || '');
+    if(/permission/i.test(c+m)) return 'ไม่มีสิทธิ์เขียนข้อมูล (ตรวจสอบ Firestore Security Rules)';
+    if(/unavailable|network|offline/i.test(c+m)) return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+    if(/quota|resource-exhausted/i.test(c+m)) return 'เกินโควตาการใช้งาน Firestore';
+    return m.slice(0,140) || c || 'ไม่ทราบสาเหตุ';
+  }
+
+  /* ---------- สถานะการบันทึก: ok | saving | offline | error ---------- */
+  function setSt(s, err){
+    if(s==='saving' && !navigator.onLine) s = 'offline';
+    var changed = s!==st; st = s; stErr = err || '';
+    if(changed) stSubs.slice().forEach(function(fn){ try{ fn(st, stErr); }catch(e){} });
+  }
+  api.status = function(){ return st; };
+  api.onStatus = function(fn){ stSubs.push(fn); return function(){ stSubs = stSubs.filter(function(x){ return x!==fn; }); }; };
+  api.pending = function(){ return busy || Object.keys(Q).length > 0; };
+
+  /* ---------- คิวเขียนข้อมูล ---------- */
+  function enqueue(ops){ ops.forEach(function(o){ delete Q[o.path]; Q[o.path] = o; }); flush(); }
+  function flush(){
+    if(busy || !fs) return;
+    var keys = Object.keys(Q);
+    if(!keys.length){ setSt('ok'); return; }
+    busy = true; setSt('saving');
+    var ops = keys.map(function(k){ return Q[k]; }); Q = {};
+    ops.sort(function(a, b){ return (a.last?1:0)-(b.last?1:0); });   /* app_meta/state เขียนท้ายสุด */
+    var chunks = [], cur = [], bytes = 0;
+    ops.forEach(function(o){
+      if(cur.length >= 400 || (cur.length && bytes+(o.size||200) > 2.5e6)){ chunks.push(cur); cur = []; bytes = 0; }   /* ≤ 400 รายการ / batch และไม่เกินขนาด request ของ Firestore */
+      cur.push(o); bytes += (o.size||200);
+    });
+    if(cur.length) chunks.push(cur);
+    var done = 0, p = Promise.resolve();
+    chunks.forEach(function(ch){
+      p = p.then(function(){
+        var b = fs.batch();
+        ch.forEach(function(o){ var ref = fs.doc(o.path); if(o.del) b['delete'](ref); else b.set(ref, o.val); });
+        return b.commit().then(function(){ done++; });
+      });
+    });
+    p.then(function(){
+      busy = false; retryN = 0;
+      if(Object.keys(Q).length) flush(); else setSt('ok');
+    }, function(e){
+      busy = false;
+      chunks.slice(done).forEach(function(ch){ ch.forEach(function(o){ if(!(o.path in Q)) Q[o.path] = o; }); });
+      setSt('error', errText(e));
+      try{ console.error('[Firestore] write failed', e); }catch(x){}
+      clearTimeout(retryT);
+      retryT = setTimeout(flush, Math.min(60000, 4000*Math.pow(2, retryN++)));
+    });
+  }
+  addEventListener('online', function(){ clearTimeout(retryT); retryN = 0; flush(); });
+  addEventListener('offline', function(){ if(api.pending()) setSt('offline'); });
+  addEventListener('beforeunload', function(e){ if(api.pending()){ e.preventDefault(); e.returnValue = ''; return ''; } });
+
+  /* ---------- บันทึก: เทียบกับ Cloud แล้วเขียนเฉพาะที่เปลี่ยน ---------- */
+  api.save = function(data, at){
+    if(!fs) throw new Error('Firestore ยังไม่พร้อม');
+    var ops = [], order = {}, orderCh = false;
+    COLLS.forEach(function(c){
+      if(!Array.isArray(data[c])){ order[c] = S.order[c] || []; return; }   /* ไม่มีชุดนี้ใน data → ไม่แตะของบน Cloud */
+      var prev = S.sets[c] || {}, cur = {}, used = {};
+      order[c] = data[c].map(function(r, i){
+        var k = keyOf(r, i, used), n = norm(r), s = stable(n);
+        cur[k] = s;
+        if(prev[k] !== s){
+          if(s.length > 300000 && unescape(encodeURIComponent(s)).length > 1000000) throw new Error('รายการ '+k+' ใหญ่เกิน 1MB (ข้อจำกัดของ Firestore)');
+          ops.push({path:P+c+'/'+k, val:enc(n), size:s.length});
+        }
+        return k;
+      });
+      Object.keys(prev).forEach(function(k){ if(!(k in cur)) ops.push({path:P+c+'/'+k, del:true, size:50}); });
+      S.sets[c] = cur;
+      if(JSON.stringify(order[c]) !== JSON.stringify(S.order[c] || [])) orderCh = true;
+    });
+    if(orderCh){ S.order = order; ops.push({path:META+'/order', val:Object.assign({_v:1}, order), size:JSON.stringify(order).length}); }
+    var extra = {}; Object.keys(data).forEach(function(k){ if(COLLS.indexOf(k) < 0 && data[k] !== undefined) extra[k] = data[k]; });
+    var xs = sig(extra);
+    if(xs !== S.extra){ S.extra = xs; ops.push({path:META+'/extra', val:{json:JSON.stringify(norm(extra))}, size:xs.length}); }
+    if(ops.length || !S.hasState){
+      S.hasState = true; S.mig = Math.max(S.mig||0, MIG);
+      ops.push({path:META+'/state', val:{v:1, mig:S.mig, savedAt:at, by:CID}, last:true, size:80});
+    }
+    if(ops.length) enqueue(ops);
+    return ops.length;
+  };
+
+  /* ---------- ประวัติการแก้ไข ---------- */
+  function logId(x){ return safeId(x._id || ('t'+(x.at||0))); }
+  api.logPut = function(list){
+    if(!fs || !list || !list.length) return;
+    enqueue(list.map(function(x){
+      var n = norm(x); n.at = Number(n.at)||0;
+      var v = enc(n); v.at = n.at;   /* ต้องมีฟิลด์ at เสมอ (ใช้เรียงลำดับ) */
+      return {path:LOGC+'/'+logId(x), val:v, size:400};
+    }));
+  };
+  api.logClear = function(){
+    if(!fs) return Promise.resolve();
+    function round(){
+      return fs.collection(LOGC).limit(400).get().then(function(snap){
+        if(snap.empty) return;
+        var b = fs.batch(); snap.docs.forEach(function(d){ b['delete'](d.ref); });
+        return b.commit().then(round);
+      });
+    }
+    return round()['catch'](function(e){ setSt('error', errText(e)); });
+  };
+
+  /* ---------- รับการเปลี่ยนแปลงจากเครื่องอื่น ---------- */
+  function remote(ev){ remoteQ.push(ev); if(applyFn) drain(); }
+  function drain(){ var evs = remoteQ; remoteQ = []; if(evs.length) applyFn(evs); }
+  api.onRemote = function(fn){ applyFn = fn; if(fn) drain(); };
+  /* รวมการเปลี่ยนแปลงจาก Cloud เข้ากับ db ปัจจุบัน (คืน object ใหม่) */
+  api.merge = function(db, evs){
+    var next = Object.assign({}, db), touched = {};
+    evs.forEach(function(ev){
+      if(ev.type==='set'){
+        var c = ev.set, arr = (next[c] || []).slice(), used = {}, idx = {}, del = {};
+        arr.forEach(function(r, i){ idx[keyOf(r, i, used)] = i; });
+        ev.ch.forEach(function(x){
+          if(x.del){ if(x.k in idx) del[idx[x.k]] = 1; }
+          else if(x.k in idx) arr[idx[x.k]] = x.rec;
+          else { idx[x.k] = arr.length; arr.push(x.rec); }
+        });
+        next[c] = arr.filter(function(r, i){ return !del[i]; }); touched[c] = 1;
+      } else if(ev.type==='order') COLLS.forEach(function(c){ touched[c] = 1; });
+      else if(ev.type==='extra') Object.assign(next, ev.extra);
+    });
+    Object.keys(touched).forEach(function(c){
+      if(!Array.isArray(next[c])) return;
+      var used = {};
+      next[c] = sortByOrder(next[c].map(function(r, i){ return {k:keyOf(r, i, used), rec:r}; }), S.order[c]).map(function(x){ return x.rec; });
+    });
+    return next;
+  };
+
+  /* ---------- listeners (รอข้อมูลชุดแรกจากเซิร์ฟเวอร์ แล้วฟังต่อแบบ realtime) ---------- */
+  function onListenErr(bad){ return function(e){ try{ console.error('[Firestore] listen failed', e); }catch(x){} setSt('error', errText(e)); bad(e); }; }
+  function listenColl(c, first, bad){
+    var isFirst = true;
+    fs.collection(P+c).onSnapshot({includeMetadataChanges:true}, function(snap){
+      if(isFirst){ if(snap.metadata.fromCache) return; isFirst = false; first(snap); return; }
+      var ch = [], m = S.sets[c] || (S.sets[c] = {});
+      snap.docChanges().forEach(function(d){
+        var k = d.doc.id;
+        if(d.doc.metadata.hasPendingWrites || ((P+c+'/'+k) in Q)) return;   /* ของเราเองที่ยังเขียนไม่เสร็จ */
+        if(d.type==='removed'){ if(k in m){ delete m[k]; ch.push({k:k, del:true}); } return; }
+        var rec = dec(d.doc.data()), s = sig(rec);
+        if(m[k] === s) return;
+        m[k] = s; ch.push({k:k, rec:rec});
+      });
+      if(ch.length) remote({type:'set', set:c, ch:ch});
+    }, onListenErr(bad));
+  }
+  function listenMeta(first, bad){
+    var isFirst = true;
+    fs.collection(META).onSnapshot({includeMetadataChanges:true}, function(snap){
+      if(isFirst){ if(snap.metadata.fromCache) return; isFirst = false; first(snap); return; }
+      snap.docChanges().forEach(function(d){
+        if(d.type==='removed' || d.doc.metadata.hasPendingWrites || ((META+'/'+d.doc.id) in Q)) return;
+        var x = d.doc.data() || {};
+        if(d.doc.id==='order'){
+          var o = {}, ch = false;
+          COLLS.forEach(function(c){ o[c] = Array.isArray(x[c]) ? x[c] : (S.order[c] || []); if(JSON.stringify(o[c]) !== JSON.stringify(S.order[c] || [])) ch = true; });
+          if(ch){ S.order = o; remote({type:'order'}); }
+        } else if(d.doc.id==='extra'){
+          var ex = {}; try{ ex = JSON.parse(x.json || '{}'); }catch(e){}
+          var xs = sig(ex); if(xs !== S.extra){ S.extra = xs; remote({type:'extra', extra:ex}); }
+        } else if(d.doc.id==='state' && x.by !== CID){
+          S.hasState = true; S.mig = Math.max(S.mig||0, Number(x.mig)||0);
+          remote({type:'state', state:x});
+        }
+      });
+    }, onListenErr(bad));
+  }
+  function readLog(snap){ return snap.docs.map(function(d){ return dec(d.data()); }); }
+  function listenLog(first, bad){
+    var isFirst = true;
+    fs.collection(LOGC).orderBy('at','desc').limit(LOG_LIMIT).onSnapshot({includeMetadataChanges:true}, function(snap){
+      if(isFirst){ if(snap.metadata.fromCache) return; isFirst = false; first(snap); return; }
+      var list = readLog(snap), ids = list.map(function(x){ return x._id || x.at; }).join('|');
+      if(ids === logIds) return;
+      logIds = ids; LOG._list = list; remote({type:'log'});
+    }, onListenErr(bad));
+  }
+
+  /* ---------- เริ่มต้น: เชื่อมต่อ + โหลดข้อมูลทั้งหมด ---------- */
+  function fail(code, msg){ var e = new Error(msg); e.code = code; return e; }
+  api.start = function(){
+    if(!window.firebase || !firebase.initializeApp || !firebase.firestore) return Promise.reject(fail('SDK', 'โหลด Firebase SDK ไม่สำเร็จ'));
+    if(!cfg.projectId || !cfg.apiKey || /YOUR_|ใส่/i.test(String(cfg.apiKey)+String(cfg.appId||''))) return Promise.reject(fail('CONFIG', 'ยังไม่ได้ใส่ค่า firebaseConfig'));
+    var app;
+    try{
+      app = firebase.apps && firebase.apps.length ? firebase.app() : firebase.initializeApp(cfg);
+      fs = app.firestore();
+      if(!inited){ inited = true; try{ fs.settings({ignoreUndefinedProperties:true, experimentalAutoDetectLongPolling:true, merge:true}); }catch(e0){} }
+    }catch(e){ return Promise.reject(e); }
+    var auth = opt.useAnonymousAuth
+      ? (firebase.auth ? firebase.auth().signInAnonymously() : Promise.reject(fail('SDK', 'โหลด Firebase Auth SDK ไม่สำเร็จ')))
+      : Promise.resolve();
+    return auth.then(function(){
+      return new Promise(function(resolve, reject){
+        var need = COLLS.length+2, got = {}, n = 0, over = false;
+        var timer = setTimeout(function(){ over = true; reject(fail('TIMEOUT', 'เชื่อมต่อ Cloud Firestore ไม่สำเร็จภายใน 30 วินาที')); }, 30000);
+        function ok(name){ return function(snap){ if(over || (name in got)) return; got[name] = snap; if(++n===need){ clearTimeout(timer); resolve(got); } }; }
+        function bad(e){ if(over) return; over = true; clearTimeout(timer); reject(e); }
+        COLLS.forEach(function(c){ listenColl(c, ok(c), bad); });
+        listenMeta(ok('__meta'), bad);
+        listenLog(ok('__log'), bad);
+      });
+    }).then(function(got){
+      var meta = {}; got.__meta.docs.forEach(function(d){ meta[d.id] = d.data() || {}; });
+      var state = meta.state || null;
+      COLLS.forEach(function(c){ S.order[c] = meta.order && Array.isArray(meta.order[c]) ? meta.order[c] : []; });
+      var extra = {}; try{ extra = meta.extra ? JSON.parse(meta.extra.json || '{}') : {}; }catch(e){ extra = {}; }
+      S.extra = sig(extra);
+      S.hasState = !!state; S.mig = state ? Number(state.mig)||0 : 0;
+      var data = {};
+      COLLS.forEach(function(c){
+        var m = S.sets[c] = {};
+        var list = got[c].docs.map(function(d){ var rec = dec(d.data()); m[d.id] = sig(rec); return {k:d.id, rec:rec}; });
+        data[c] = sortByOrder(list, S.order[c]).map(function(x){ return x.rec; });
+      });
+      Object.keys(extra).forEach(function(k){ if(COLLS.indexOf(k) < 0) data[k] = extra[k]; });
+      LOG._list = readLog(got.__log);
+      logIds = LOG._list.map(function(x){ return x._id || x.at; }).join('|');
+      return {initialized:!!state,
+              raw:state ? JSON.stringify({v:1, mig:Number(state.mig)||0, savedAt:Number(state.savedAt)||0, data:data}) : null};
+    });
+  };
+  return api;
+})();
+var boot = null;   /* โหลดจาก Cloud Firestore ก่อน แล้วค่อยเรียก loadData() — ดูส่วน "เริ่มระบบ" ท้ายไฟล์ */
 function persist(data){
   if(LOAD_ERR) return -2;   /* โหลดข้อมูลเดิมไม่สำเร็จ: ยังไม่บันทึกทับจนกว่าจะกดยืนยัน */
-  try{ var at=Date.now(); localStorage.setItem(KEY, JSON.stringify({v:1,mig:MIG,savedAt:at,data:data})); return at; }
-  catch(e){ return -1; }
+  try{ var at=Date.now(); CLOUD.save(data, at); return at; }   /* เขียนขึ้น Firestore แบบเบื้องหลัง (เฉพาะรายการที่เปลี่ยน) */
+  catch(e){ try{ console.error('[Firestore] save failed', e); }catch(x){} return -1; }
 }
 var uid = function(pre){ return pre+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); };
 
@@ -2296,18 +2625,25 @@ function LifeMeter(props){
     span({className:'block h-full rounded-r-[2px]', style:{width:w+'%', background:LIFE_STATE[li.state].color}}));
 }
 
-/* ---------------- ประวัติการแก้ไข (เก็บใน localStorage) ---------------- */
-var LOG_KEY = 'ict-asset-log';
+/* ---------------- ประวัติการแก้ไข (เก็บใน Cloud Firestore: คอลเลกชัน edit_log) ----------------
+   LOG._list = รายการล่าสุดที่โหลดจาก Cloud (ใหม่ → เก่า) · อัปเดตอัตโนมัติเมื่อเครื่องอื่นเพิ่มประวัติ */
+var LOG_KEY = 'ict-asset-log';   /* คีย์เดิมใน localStorage — ใช้ย้ายประวัติเก่าขึ้น Cloud ครั้งแรกเท่านั้น */
 var LOG = {
-  all: function(){ try{ return JSON.parse(localStorage.getItem(LOG_KEY)) || []; }catch(e){ return []; } },
-  write: function(list){ try{ localStorage.setItem(LOG_KEY, JSON.stringify(list.slice(0,600))); }catch(e){} },
+  _list: [],
+  all: function(){ return LOG._list.slice(); },
+  write: function(list){
+    var seen = {}; LOG._list.forEach(function(x){ seen[x._id || ('t'+x.at)] = 1; });
+    LOG._list = (list || []).slice(0, CLOUD.LOG_LIMIT);
+    CLOUD.logPut(LOG._list.filter(function(x){ return x && !seen[x._id || ('t'+x.at)]; }));   /* ส่งเฉพาะรายการใหม่ */
+  },
   add: function(entry){
-    var list = LOG.all();
-    list.unshift(Object.assign({_id:'a'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), at:Date.now()}, entry));
-    LOG.write(list);
+    var e = Object.assign({_id:'a'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), at:Date.now()}, entry);
+    LOG._list.unshift(e);
+    if(LOG._list.length > CLOUD.LOG_LIMIT) LOG._list.length = CLOUD.LOG_LIMIT;
+    CLOUD.logPut([e]);
   },
   forDoc: function(id){ return LOG.all().filter(function(x){ return x.docId===id; }).slice(0,15); },
-  clear: function(){ LOG.write([]); }
+  clear: function(){ LOG._list = []; CLOUD.logClear(); }   /* ล้างประวัติบน Cloud (ทุกเครื่อง) */
 };
 var META_FIELDS = ['_id','updatedAt','repairs','pm'];
 var FIELD_TH = {
@@ -2833,7 +3169,7 @@ function ActivityView(props){
                 h(ChangeList,{changes:r.changes})));
           })),
     rows.length ? p({className:'text-center text-[11px] text-slate-400'},
-      'เก็บประวัติล่าสุดสูงสุด 600 รายการในเบราว์เซอร์เครื่องนี้') : null);
+      'แสดงประวัติล่าสุดสูงสุด '+CLOUD.LOG_LIMIT+' รายการ · เก็บบน Cloud Firestore (รวมทุกเครื่อง)') : null);
 }
 
 /* ---------------- ตัวเลขนับขึ้น ---------------- */
@@ -3248,7 +3584,7 @@ function DataCheck(props){
         div({className:'font-display text-[15px] font-semibold text-slate-900 dark:text-white'}, res.length ? 'พบ '+res.length+' หัวข้อที่ควรตรวจสอบ · รวม '+items+' รายการ' : 'ไม่พบข้อมูลซ้ำหรือไม่ตรงกัน'),
         div({className:'mt-0.5 flex flex-wrap items-center gap-1.5 text-[11.5px] text-slate-500 dark:text-slate-400'},
           ['high','med','low'].map(function(k){ return n[k] ? span({key:k, className:cx('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold', SEV_UI[k].cls)}, SEV_UI[k].label, span({className:'tnum'}, n[k])) : null; }),
-          span(null, 'ตรวจจากข้อมูลล่าสุดในเบราว์เซอร์นี้ · อัปเดตทันทีเมื่อแก้ไข'))),
+          span(null, 'ตรวจจากข้อมูลล่าสุดบน Cloud · อัปเดตทันทีเมื่อแก้ไข'))),
       res.length ? Btn({variant:'ghost', sm:true, icon:'Sheet|Table', onClick:exportRows}, 'ส่งออก Excel') : null),
     res.length ? div({className:'noscroll -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5'},
       button({type:'button', 'aria-pressed':!gf, onClick:function(){ setGf(''); }, className:chipCls(!gf)}, 'ทั้งหมด', span({className:'font-mono text-[10.5px] opacity-60 tnum'}, res.length)),
@@ -4048,6 +4384,26 @@ function App(){
       dense = ds[0], setDense = ds[1];
   var lg = useState(0), logStamp = lg[0], setLogStamp = lg[1];
   var lbt = useState(0), setLibTick = lbt[1];   /* re-render หลังโหลดไลบรารีครบ (ไอคอน) */
+  var cst = useState(CLOUD.status()), cloudSt = cst[0], setCloudSt = cst[1];   /* สถานะบันทึกขึ้น Cloud Firestore: ok | saving | offline | error */
+  useEffect(function(){
+    var off = CLOUD.onStatus(function(s, err){
+      setCloudSt(s);
+      if(s==='error') say('บันทึกขึ้น Cloud Firestore ไม่สำเร็จ'+(err ? ' — '+err : '')+' · ระบบจะลองใหม่อัตโนมัติ');
+    });
+    /* มีการแก้ไขจากเครื่องอื่น → รวมเข้ากับข้อมูลที่แสดงอยู่ทันที (ไม่ต้องรีเฟรช) */
+    CLOUD.onRemote(function(evs){
+      setDb(function(prev){ return CLOUD.merge(prev, evs); });
+      evs.forEach(function(ev){
+        if(ev.type!=='state' || !ev.state) return;
+        if(ev.state.savedAt) setSavedAt(Number(ev.state.savedAt)||0);
+        if(Number(ev.state.mig) > MIG) say('มีเครื่องอื่นบันทึกด้วยไฟล์เวอร์ชันใหม่กว่า — ควรเปิดไฟล์ index.html ล่าสุด');
+      });
+      if(evs.some(function(ev){ return ev.type==='log'; })) setLogStamp(Date.now());
+    });
+    setCloudSt(CLOUD.status());   /* สถานะอาจเปลี่ยนระหว่างแสดงผลครั้งแรก */
+    if(CLOUD.note){ say(CLOUD.note); CLOUD.note = ''; }
+    return function(){ off(); CLOUD.onRemote(null); };
+  },[]);
   useEffect(function(){
     if(document.readyState === 'complete') return;
     function bump(){ setLibTick(function(x){ return x+1; }); }
@@ -4089,8 +4445,8 @@ function App(){
   function commit(next, msg){
     setDb(next);
     var at = persist(next);
-    if(at===-2) say((msg ? msg+' · ' : '')+'ยังไม่บันทึกลงเบราว์เซอร์ — กด "ยืนยันใช้ข้อมูลนี้" ที่แถบด้านบนก่อน');
-    else if(at<0) say('บันทึกไม่สำเร็จ — พื้นที่จัดเก็บของเบราว์เซอร์เต็มหรือถูกปิดไว้');
+    if(at===-2) say((msg ? msg+' · ' : '')+'ยังไม่บันทึกขึ้น Cloud — กด "ยืนยันใช้ข้อมูลนี้" ที่แถบด้านบนก่อน');
+    else if(at<0) say('บันทึกไม่สำเร็จ — เชื่อมต่อ Cloud Firestore ไม่ได้');
     else { setSavedAt(at); if(msg) say(msg); }
   }
   /* พนักงานรอเริ่มงาน: ถึงวันเริ่มงานแล้ว + มีรายการ New Onboarding ที่ส่งมอบแล้ว → ทำงานอยู่ (ตรวจครั้งเดียวตอนเปิดแอป) */
@@ -4127,8 +4483,8 @@ function App(){
   function confirmLoadErr(){
     LOAD_ERR = null; setLoadErr(null);
     var at = persist(db);
-    if(at<0) say('บันทึกไม่สำเร็จ — พื้นที่จัดเก็บของเบราว์เซอร์เต็มหรือถูกปิดไว้');
-    else { setSavedAt(at); say('ยืนยันแล้ว — เริ่มบันทึกข้อมูลชุดนี้ลงเบราว์เซอร์'); }
+    if(at<0) say('บันทึกไม่สำเร็จ — เชื่อมต่อ Cloud Firestore ไม่ได้');
+    else { setSavedAt(at); say('ยืนยันแล้ว — เริ่มบันทึกข้อมูลชุดนี้ขึ้น Cloud Firestore'); }
   }
   /* กู้คืนจากไฟล์สำรอง JSON: เก็บข้อมูลเดิมไว้ก่อน · ข้อมูลเวอร์ชันเก่าผ่าน migration เดียวกับ loadData · รวมประวัติการแก้ไข */
   function restoreBackup(o){
@@ -4137,7 +4493,7 @@ function App(){
     /* ไม่มี mig (ไฟล์สำรองรุ่นก่อน) → ถือว่าเป็นรุ่นปัจจุบัน ไม่รัน migration ซ้ำ (กันข้อมูลถูกเขียนทับด้วยค่าตั้งต้น) */
     var res = loadData(JSON.stringify({v:1, mig:(o && o.data && typeof o.mig==='number') ? o.mig : MIG, savedAt:(o && o.savedAt) || Date.now(), data:dd}));
     if(!res || !res.data) return false;
-    try{ var cur = localStorage.getItem(KEY); if(cur) localStorage.setItem(KEY+'-pre-restore-'+Date.now(), cur); }catch(e){}
+    try{ localStorage.setItem(KEY+'-pre-restore-'+Date.now(), JSON.stringify({v:1, mig:MIG, savedAt:savedAt, data:db})); }catch(e){}   /* สำเนาข้อมูลก่อนกู้คืน (เก็บในเบราว์เซอร์นี้) */
     if(o && Array.isArray(o.log) && o.log.length){
       var mine = LOG.all(), seen = {};
       mine.forEach(function(x){ seen[x._id || ('t'+x.at)] = 1; });
@@ -5088,7 +5444,7 @@ function App(){
           chkN ? span({title:'รายการที่ควรแก้ '+chkN, className:cx('rounded-md px-1.5 py-0.5 font-mono text-[10.5px] tnum', hi ? 'bg-rose-400/25 text-rose-100' : 'bg-amber-300/25 text-amber-100')}, chkN) : null); })(),
       navBtn(NAV.filter(function(n){ return n.id==='activity'; })[0]),
       (function(){ var bi = backupInfo(savedAt, lastBackup);
-        return button({type:'button', 'data-backup':bi.warn ? 'warn' : 'ok', onClick:function(){ setModal({kind:'storage'}); }, title:'บันทึกข้อมูลในเบราว์เซอร์นี้ · ส่งออก / สำรอง / กู้คืน',
+        return button({type:'button', 'data-backup':bi.warn ? 'warn' : 'ok', onClick:function(){ setModal({kind:'storage'}); }, title:'ข้อมูลบน Cloud Firestore · ส่งออก / สำรอง / กู้คืน',
           className:cx('flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-medium hover:bg-white/[0.07] hover:text-white', bi.warn ? 'bg-amber-400/10 text-amber-100 ring-1 ring-inset ring-amber-300/30' : 'text-teal-50/75')},
           Icon({name:bi.warn ? 'TriangleAlert|AlertTriangle' : 'Database', size:16, className:bi.warn ? 'text-amber-300' : 'text-teal-200/55'}),
           span({className:'min-w-0 flex-1'},
@@ -5144,7 +5500,7 @@ function App(){
           Icon({name:'TriangleAlert|AlertTriangle', size:20, className:'shrink-0 text-red-600 dark:text-red-300'}),
           div({className:'min-w-0 flex-1 text-[13px] leading-relaxed'},
             span({className:'font-semibold'}, 'โหลดข้อมูลเดิมไม่สำเร็จ'),
-            ' — '+(LOAD_ERR_KEY ? 'ระบบเก็บข้อมูลเดิมไว้ที่ '+LOAD_ERR_KEY : 'ข้อมูลเดิมยังอยู่ที่ '+KEY)+' และแสดงข้อมูลตั้งต้นแทน · ยังไม่บันทึกทับจนกว่าจะกด "ยืนยันใช้ข้อมูลนี้"',
+            ' — '+(LOAD_ERR_KEY ? 'ระบบเก็บสำเนาข้อมูลเดิมไว้ในเบราว์เซอร์ที่ '+LOAD_ERR_KEY : 'ข้อมูลเดิมบน Cloud ยังไม่ถูกแก้ไข')+' และแสดงข้อมูลตั้งต้นแทน · ยังไม่บันทึกทับจนกว่าจะกด "ยืนยันใช้ข้อมูลนี้"',
             div({className:'text-[11.5px] text-red-700/80 dark:text-red-200/70'}, 'สาเหตุ: '+loadErr)),
           Btn({variant:'danger', icon:'Check', onClick:confirmLoadErr}, 'ยืนยันใช้ข้อมูลนี้')) : null,
         header({className:'top-teal sticky top-0 z-30'},
@@ -5182,8 +5538,8 @@ function App(){
                 : view2==='services' ? 'ค่าบริการ Cloud · Network · Website · MA และวันครบกำหนดต่ออายุ'
                 : view2==='employees' ? 'รายชื่อพนักงานทั้งหมด — ติดต่อ แผนก และคอม / License ที่ผูกอยู่'
                 : 'ค่าบริการคลาวด์และบริการรายเดือนของบริษัท')),
-            savedAt ? Badge({className:'hidden bg-amber-300/15 text-amber-100 ring-amber-200/35 sm:inline-flex', dot:true},
-              'บันทึกแล้ว') : null,
+            savedAt || cloudSt!=='ok' ? Badge({className:cx('hidden sm:inline-flex', cloudSt==='error' ? 'bg-rose-400/25 text-rose-50 ring-rose-200/50' : 'bg-amber-300/15 text-amber-100 ring-amber-200/35'), dot:true},
+              cloudSt==='saving' ? 'กำลังบันทึก…' : cloudSt==='offline' ? 'ออฟไลน์ · รอส่งข้อมูล' : cloudSt==='error' ? 'บันทึกขึ้น Cloud ไม่สำเร็จ' : 'บันทึกบน Cloud แล้ว') : null,
             /* โลโก้บริษัท (มุมขวาของแถบด้านบน) */
             div({className:cx('flex shrink-0 items-center', savedAt ? 'sm:ml-1 sm:border-l sm:border-white/15 sm:pl-4' : 'sm:ml-2'), 'data-logo':'1', title:'ICT Manufacturing Co., Ltd.'},
               img({src:'data:image/png;base64,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', alt:'ICT', className:'h-[22px] w-auto select-none drop-shadow-[0_1px_1px_rgba(0,0,0,.25)] sm:h-[28px]', draggable:false})))),
@@ -5245,7 +5601,7 @@ function App(){
         onSave:function(r){ upsert('subscriptions', r, 'บันทึกแล้ว'); setModal(null); },
         onDelete:function(id){ remove('subscriptions', id, 'ลบรายการแล้ว'); setModal(null); }}) : null,
     modal && modal.kind==='storage' ? h(StorageModal,{db:db, savedAt:savedAt, lastBackup:lastBackup, onBackup:markBackup, canWrite:canWrite, onExportHtml:exportNow, onClose:function(){ setModal(null); },
-        onReset:function(){ try{ localStorage.removeItem(KEY); }catch(e){} LOAD_ERR = null; setLoadErr(null); setDb(seedData()); setSavedAt(0); setModal(null); say('คืนค่าข้อมูลตั้งต้นแล้ว'); },
+        onReset:function(){ LOAD_ERR = null; setLoadErr(null); commit(seedData(), 'คืนค่าข้อมูลตั้งต้นแล้ว (บันทึกขึ้น Cloud)'); setModal(null); },
         onImport:function(o){ if(restoreBackup(o)){ setModal(null); return true; } return false; }, say:say}) : null,
     toastEl);
 }
@@ -11497,13 +11853,13 @@ function StorageModal(props){
   var im = useState(''), imp=im[0], setImp=im[1];
   var ar = useState(false), armed=ar[0], setArmed=ar[1];
   var rr = useState(false), rArmed=rr[0], setRArmed=rr[1];   /* กู้คืนจาก JSON: กดสองครั้งเพื่อยืนยัน */
-  return h(Modal,{onClose:props.onClose, eyebrow:'Local Storage', title:'ข้อมูลที่บันทึกในเบราว์เซอร์นี้',
+  return h(Modal,{onClose:props.onClose, eyebrow:'Cloud Firestore', title:'ข้อมูลที่บันทึกบน Cloud Firestore',
     footer:[Btn({key:'c', variant:'ghost', onClick:props.onClose},'ปิด'),
             span({key:'sp', className:'flex-1'}),
             props.canWrite===false ? null : Btn({key:'r', variant:'danger', icon:'RotateCcw', onClick:function(){
               if(!armed){ setArmed(true); setTimeout(function(){ setArmed(false); },4500); return; }
               props.onReset();
-            }}, armed?'กดอีกครั้ง — การแก้ไขทั้งหมดจะหาย':'คืนค่าข้อมูลตั้งต้น')]},
+            }}, armed?'กดอีกครั้ง — ข้อมูลบน Cloud (ทุกเครื่อง) จะถูกแทนที่':'คืนค่าข้อมูลตั้งต้น')]},
     div({className:'space-y-4'},
       div({className:'grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 dark:border-slate-800 dark:bg-slate-800'},
         [['Hardware', props.db.hardware.length],['Licenses', props.db.licenses.length],['Subscriptions', props.db.subscriptions.length]]
@@ -11521,7 +11877,7 @@ function StorageModal(props){
           Icon({name:bi.warn ? 'TriangleAlert|AlertTriangle' : 'ShieldCheck|Shield', size:20, className:bi.warn ? 'text-amber-600' : 'text-emerald-600'}),
           div({className:'min-w-0 flex-1'},
             div({className:cx('text-[13px] font-semibold', bi.warn ? 'text-amber-900 dark:text-amber-200' : 'text-emerald-800 dark:text-emerald-300')}, bi.txt+(bi.dirty ? ' · มีการแก้ไขหลังสำรองล่าสุด' : '')),
-            div({className:'text-[11.5px] leading-relaxed text-slate-600 dark:text-slate-300'}, 'ข้อมูลทั้งหมดอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น ถ้าล้างประวัติ / เปลี่ยนเครื่อง ข้อมูลจะหาย — แนะนำดาวน์โหลดไฟล์สำรองอย่างน้อยสัปดาห์ละครั้ง และเก็บไว้ใน Drive ของแผนก'),
+            div({className:'text-[11.5px] leading-relaxed text-slate-600 dark:text-slate-300'}, 'ข้อมูลทั้งหมดอยู่บน Cloud Firestore (โปรเจกต์ '+((window.firebaseConfig||{}).projectId||'-')+') ใช้ร่วมกันทุกเครื่อง — แนะนำดาวน์โหลดไฟล์สำรองอย่างน้อยสัปดาห์ละครั้ง และเก็บไว้ใน Drive ของแผนก'),
             div({'data-privacy':'json', className:'mt-1 text-[11.5px] font-medium text-rose-700 dark:text-rose-300'}, 'ไฟล์นี้มี Windows Key, อีเมล และเบอร์โทรแบบอ่านได้ — แชร์เฉพาะผู้เกี่ยวข้อง')),
           Btn({variant:'primary', icon:'Download', onClick:function(){
             var name = 'ict-asset-backup-'+new Date().toISOString().slice(0,10)+'.json';
@@ -11529,7 +11885,7 @@ function StorageModal(props){
             if(props.onBackup) props.onBackup(); props.say('ดาวน์โหลดไฟล์สำรอง '+name+' แล้ว');
           }}, 'ดาวน์โหลดไฟล์สำรอง (.json)')); })(),
       p({className:'text-[12px] leading-relaxed text-slate-500 dark:text-slate-400'},
-        props.savedAt ? 'บันทึกล่าสุด '+new Date(props.savedAt).toLocaleString('th-TH')+' — ข้อมูลเก็บด้วย localStorage ของเบราว์เซอร์เครื่องนี้เท่านั้น ไม่ซิงก์ข้ามเครื่อง และจะหายถ้าล้างข้อมูลเว็บไซต์'
+        props.savedAt ? 'บันทึกล่าสุด '+new Date(props.savedAt).toLocaleString('th-TH')+' — ข้อมูลเก็บบน Cloud Firestore ซิงก์ทุกเครื่องแบบ realtime'
                      : 'ยังไม่มีการแก้ไข กำลังแสดงข้อมูลตั้งต้นที่นำเข้าจากทะเบียนของฝ่ายไอที'),
       div({className:'flex flex-wrap gap-2'},
         Btn({variant:'ghost', icon:'Sheet|Table', onClick:function(){
@@ -11567,10 +11923,65 @@ function StorageModal(props){
         if(!rArmed){ setRArmed(true); setTimeout(function(){ setRArmed(false); },4500); return; }
         setRArmed(false);
         if(!props.onImport(o)) props.say('กู้คืนไม่สำเร็จ — รูปแบบข้อมูลในไฟล์สำรองไม่ถูกต้อง');
-      }}, rArmed ? 'กดอีกครั้ง — ข้อมูลปัจจุบันจะถูกแทนที่ (เก็บสำรองไว้ในเบราว์เซอร์)' : 'นำเข้าจาก JSON')));
+      }}, rArmed ? 'กดอีกครั้ง — ข้อมูลบน Cloud จะถูกแทนที่ (เก็บสำเนาเดิมไว้ในเบราว์เซอร์นี้)' : 'นำเข้าจาก JSON')));
 }
 
-RD.createRoot(document.getElementById('root')).render(h(App));
+/* ---------------- เริ่มระบบ: โหลดข้อมูลจาก Cloud Firestore ก่อน แล้วค่อยแสดงหน้าจอ ---------------- */
+function bootFail(e){
+  try{ console.error('[Firestore] start failed', e); }catch(x){}
+  var code = String(e && e.code || ''), msg = String(e && e.message || e || ''), all = code+' '+msg;
+  var hint = code==='CONFIG' ? 'เปิดไฟล์ index.html แล้วใส่ค่าในส่วน "FIREBASE CONFIG" (ใน <head>) ให้ครบ — คัดลอกจาก Firebase Console → Project settings → Your apps → Web app'
+    : code==='SDK' ? 'โหลดสคริปต์ Firebase จาก www.gstatic.com ไม่ได้ — ตรวจสอบอินเทอร์เน็ต แล้วเปิดหน้านี้ใหม่'
+    : code==='TIMEOUT' ? 'ตรวจสอบอินเทอร์เน็ต / Firewall ของบริษัท (ต้องเข้าถึง firestore.googleapis.com ได้) และตรวจว่าสร้าง Firestore Database ในโปรเจกต์แล้ว'
+    : /permission/i.test(all) ? 'Firestore Security Rules ไม่อนุญาตให้อ่าน/เขียน — ตั้งค่า Rules ตามไฟล์ firestore.rules'
+    : /operation-not-allowed|admin-restricted/i.test(all) ? 'เปิด Anonymous sign-in ที่ Firebase Console → Authentication → Sign-in method หรือตั้ง useAnonymousAuth: false'
+    : /api-key|invalid-api-key|API key/i.test(all) ? 'ค่า apiKey ใน firebaseConfig ไม่ถูกต้อง หรือ API key ถูกจำกัดโดเมนไว้ (ตรวจใน Google Cloud Console → Credentials)'
+    : /not-found|does not exist/i.test(all) ? 'ยังไม่ได้สร้าง Firestore Database — Firebase Console → Firestore Database → Create database'
+    : 'ตรวจสอบค่า firebaseConfig และการเชื่อมต่อ แล้วลองใหม่';
+  var root = document.getElementById('root'); if(!root) return;
+  root.innerHTML = '';
+  var box = document.createElement('div');
+  box.setAttribute('role', 'alert');
+  box.className = 'mx-auto mt-16 max-w-xl rounded-2xl border border-red-200 bg-white p-6 shadow-card dark:border-red-500/40 dark:bg-slate-900';
+  var t = document.createElement('div'); t.className = 'font-display text-[17px] font-semibold text-red-700 dark:text-red-300';
+  t.textContent = 'เชื่อมต่อ Cloud Firestore ไม่สำเร็จ';
+  var d = document.createElement('div'); d.className = 'mt-2 text-[13.5px] leading-relaxed text-slate-700 dark:text-slate-200'; d.textContent = hint;
+  var c = document.createElement('div'); c.className = 'mt-3 break-all rounded-lg bg-slate-100 px-3 py-2 font-mono text-[11.5px] text-slate-600 dark:bg-slate-800 dark:text-slate-300';
+  c.textContent = (code ? '['+code+'] ' : '')+msg+' · projectId: '+((window.firebaseConfig||{}).projectId||'-');
+  var b = document.createElement('button'); b.type = 'button'; b.textContent = 'ลองใหม่';
+  b.className = 'mt-4 rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-brand-700';
+  b.onclick = function(){ location.reload(); };
+  box.appendChild(t); box.appendChild(d); box.appendChild(c); box.appendChild(b); root.appendChild(box);
+}
+(function(){
+  var bootEl = document.getElementById('boot');
+  if(bootEl) bootEl.innerHTML = '<i></i> กำลังเชื่อมต่อ Cloud Firestore และโหลดข้อมูล…';
+  CLOUD.start().then(function(res){
+    CLOUD_RAW = res.raw;
+    /* Firestore ยังว่าง (เปิดใช้ครั้งแรก): ย้ายข้อมูลเดิมจาก localStorage ของเบราว์เซอร์นี้ขึ้น Cloud (ถามก่อน) */
+    if(!res.initialized){
+      var legacy = null, useLegacy = false;
+      try{ legacy = localStorage.getItem(KEY); }catch(e0){}
+      if(legacy){ try{ useLegacy = window.confirm('ยังไม่มีข้อมูลบน Cloud Firestore — พบข้อมูลเดิมที่บันทึกไว้ในเบราว์เซอร์นี้\n\nตกลง = อัปโหลดข้อมูลในเบราว์เซอร์นี้ขึ้น Cloud (แนะนำ)\nยกเลิก = เริ่มจากข้อมูลตั้งต้นของระบบ'); }catch(e1){ useLegacy = true; } }
+      if(useLegacy){
+        CLOUD_RAW = legacy;
+        try{
+          var ll = JSON.parse(localStorage.getItem(LOG_KEY)) || [];
+          if(ll.length){
+            var mine = LOG.all(), seen = {};
+            mine.forEach(function(x){ seen[x._id || ('t'+x.at)] = 1; });
+            LOG.write(mine.concat(ll.filter(function(x){ return x && !seen[x._id || ('t'+x.at)]; })).sort(function(a, b){ return (b.at||0)-(a.at||0); }));
+          }
+        }catch(e2){}
+        CLOUD.note = 'ย้ายข้อมูลเดิมจากเบราว์เซอร์นี้ขึ้น Cloud Firestore แล้ว';
+      } else CLOUD.note = 'เริ่มใช้งาน Cloud Firestore — บันทึกข้อมูลตั้งต้นขึ้น Cloud แล้ว';
+    }
+    boot = loadData();
+    /* ครั้งแรก / ข้อมูลผ่าน migration / ใช้ข้อมูลจากไฟล์ Export → บันทึกขึ้น Cloud (เฉพาะส่วนที่ต่าง) */
+    if(!LOAD_ERR && (!res.initialized || CLOUD.bootDirty)){ var at = persist(boot.data); if(at > 0) boot.savedAt = at; }
+    RD.createRoot(document.getElementById('root')).render(h(App));
+  })['catch'](bootFail);
+})();
 })();
 </script>
 </body>
